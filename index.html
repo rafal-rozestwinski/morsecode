@@ -55,7 +55,7 @@
     display: grid;
     grid-template-columns: 52px 1fr auto;
     align-items: center;
-    padding: 42px 10px 6px;
+    padding: 58px 10px 6px;
     font-size: 14px;
     letter-spacing: 0.04em;
   }
@@ -77,11 +77,18 @@
     cursor: pointer;
   }
   #lang button.on { color: #fff; border-color: #e23b3b; }
-  #sibling {
+  #corner {
     position: fixed;
     top: 8px;
     left: 8px;
     z-index: 8;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 168px);
+  }
+  #sibling, #home, #zip {
     background: #000;
     color: #9a9a9a;
     border: 1px solid #333;
@@ -90,7 +97,21 @@
     padding: 4px 7px;
     text-decoration: none;
   }
-  #sibling:hover { color: #fff; border-color: #e23b3b; }
+  #home {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #e23b3b;
+    padding: 4px 6px;
+  }
+  #home svg { display: block; }
+  #zip { color: #ffb4b4; }
+  #sibling:hover, #home:hover, #zip:hover { color: #fff; border-color: #e23b3b; }
+  @media (max-width: 720px) {
+    #sibling, #zip { order: 1; }
+    #home { order: 2; flex-basis: 100%; }
+    header { padding-top: 76px; }
+  }
   #mode { text-align: center; }
   #left { color: #d7d7d7; padding-right: 6px; }
   #reset {
@@ -377,7 +398,19 @@
 </style>
 </head>
 <body>
-<a id="sibling" href="tx/">Nadawaj</a>
+<div id="corner">
+  <a id="home" href="https://morse.rozestwinski.com" target="_blank" rel="noopener">
+    <svg viewBox="0 0 34 10" width="34" height="10" aria-hidden="true">
+      <rect x="0" y="3" width="4" height="4" fill="currentColor"/>
+      <rect x="7" y="3" width="12" height="4" fill="currentColor"/>
+      <rect x="22" y="3" width="4" height="4" fill="currentColor"/>
+      <rect x="29" y="3" width="5" height="4" fill="currentColor"/>
+    </svg>
+    morse.rozestwinski.com
+  </a>
+  <a id="sibling" href="tx/">Nadawaj</a>
+  <a id="zip" href="morse.zip">ZIP</a>
+</div>
 <nav id="lang">
   <button type="button" data-lang="pl">Polski</button>
   <button type="button" data-lang="de">Deutsch</button>
