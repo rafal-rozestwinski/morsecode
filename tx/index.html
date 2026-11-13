@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Morse</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: #000;
+    color: #f2f2f2;
+    font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+    display: flex;
+    justify-content: center;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    background-image:
+      linear-gradient(#e23b3b, #e23b3b),
+      linear-gradient(#e23b3b, #e23b3b),
+      linear-gradient(#d48a8a, #d48a8a),
+      linear-gradient(#5c5c5c, #5c5c5c),
+      linear-gradient(#e23b3b, #e23b3b),
+      linear-gradient(#6e6e6e, #6e6e6e),
+      linear-gradient(#e23b3b, #e23b3b),
+      linear-gradient(#9a9a9a, #9a9a9a),
+      linear-gradient(#e23b3b, #e23b3b),
+      linear-gradient(#4a4a4a, #4a4a4a),
+      linear-gradient(#ff7e7e, #ff7e7e),
+      linear-gradient(#e23b3b, #e23b3b);
+    background-size:
+      3px 3px, 2px 2px, 3px 3px, 2px 2px,
+      4px 4px, 2px 2px, 3px 3px, 2px 2px,
+      3px 3px, 4px 4px, 2px 2px, 3px 3px;
+    background-position:
+      18% 12%, 72% 8%, 40% 22%, 88% 28%,
+      10% 46%, 63% 38%, 30% 64%, 82% 58%,
+      50% 16%, 22% 78%, 70% 72%, 44% 48%;
+  }
+  #sibling {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 8;
+    background: #000;
+    color: #9a9a9a;
+    border: 1px solid #333;
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 7px;
+    text-decoration: none;
+  }
+  #sibling:hover { color: #fff; border-color: #e23b3b; }
+  #app {
+    width: min(480px, 100%);
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  header {
+    display: grid;
+    grid-template-columns: 52px 1fr auto;
+    align-items: center;
+    padding: 42px 10px 6px;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+  #lang {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 8;
+    display: flex;
+    gap: 4px;
+  }
+  #lang button {
+    background: #000;
+    color: #9a9a9a;
+    border: 1px solid #333;
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 7px;
+    cursor: pointer;
+  }
+  #lang button.on { color: #fff; border-color: #e23b3b; }
+  #mode { text-align: center; }
+  #left { color: #d7d7d7; padding-right: 6px; }
+  #reset {
+    background: transparent;
+    color: #c8c8c8;
+    border: 0;
+    font: inherit;
+    font-size: 20px;
+    cursor: pointer;
+    width: 48px;
+    height: 36px;
+  }
+  #reset.armed { font-size: 12px; }
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+  #stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    width: min(100%, 420px);
+  }
+  #prompt { margin: 0; font-size: 18px; letter-spacing: 0.03em; }
+  #target {
+    margin: 0;
+    min-height: 1em;
+    font-size: 84px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  #target.good { color: #3dff8a; }
+  #target.bad { color: #ffe14a; }
+  #crib, #trace {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 16px;
+  }
+  #crib[hidden] { display: none; }
+  #crib i, #trace i {
+    display: block;
+    height: 10px;
+    background: #e23b3b;
+  }
+  #crib i { background: #ffb4b4; }
+  #crib i.dit, #trace i.dit { width: 10px; }
+  #crib i.dah, #trace i.dah { width: 34px; }
+  #trace i.live { background: #ff7e7e; }
+  #trace.good i { background: #3dff8a; }
+  #trace.bad i { background: #ffe14a; }
+  #compare {
+    margin: 0;
+    min-height: 1.3em;
+    color: #ffe14a;
+    font-size: 14px;
+    text-align: center;
+  }
+  #mark {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 28px;
+  }
+  #mark i {
+    display: block;
+    width: 6px;
+    height: 8px;
+    background: #881c1c;
+  }
+  #app.playing #mark i { background: #e23b3b; animation: hop 0.7s ease-in-out infinite; }
+  #app.playing #mark i:nth-child(2) { animation-delay: 0.08s; }
+  #app.playing #mark i:nth-child(3) { animation-delay: 0.16s; }
+  #app.playing #mark i:nth-child(4) { animation-delay: 0.24s; }
+  #app.playing #mark i:nth-child(5) { animation-delay: 0.32s; }
+  @keyframes hop {
+    0%, 100% { height: 8px; }
+    50% { height: 26px; }
+  }
+  #hear {
+    background: #000;
+    color: #f2f2f2;
+    border: 2px solid #e23b3b;
+    font: inherit;
+    letter-spacing: 0.04em;
+    padding: 8px 18px;
+    cursor: pointer;
+  }
+  #hear[hidden] { display: none; }
+  #app.playing #hear { color: #ffb4b4; }
+  #options-toggle {
+    align-self: flex-start;
+    margin: 0 12px;
+    padding: 4px 0;
+    background: transparent;
+    color: #ffb4b4;
+    border: 0;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #options[hidden] { display: none; }
+  #tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 0 12px 4px;
+    color: #a8a8a8;
+    font-size: 12px;
+  }
+  #tools label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  #tools button, #card .link, #about-back, #pick-back {
+    background: transparent;
+    color: #ffb4b4;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  #key-mode { display: flex; gap: 6px; }
+  #key-mode button {
+    background: #000;
+    color: #9a9a9a;
+    border: 1px solid #333;
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  #key-mode button.on { color: #fff; border-color: #e23b3b; }
+  #speed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    padding: 0 12px 8px;
+    color: #a8a8a8;
+    font-size: 12px;
+  }
+  #speed label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 200px;
+  }
+  #speed input[type="range"] {
+    width: min(140px, 34vw);
+    accent-color: #e23b3b;
+  }
+  #keymap {
+    margin: 0;
+    padding: 0 12px 8px;
+    color: #8d8d8d;
+    font-size: 12px;
+  }
+  body.wide-keys #app { width: 100%; }
+  body.wide-keys header,
+  body.wide-keys main,
+  body.wide-keys #options,
+  body.wide-keys #options-toggle {
+    width: min(480px, 100%);
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+  }
+  body.wide-keys #options-toggle { padding-left: 12px; }
+  #keyer {
+    display: flex;
+    gap: 8px;
+    padding: 4px 8px calc(12px + env(safe-area-inset-bottom));
+  }
+  #keyer button {
+    flex: 1;
+    min-height: 148px;
+    background: #050505;
+    color: #f4f4f4;
+    border: 2px solid #e23b3b;
+    border-radius: 2px;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+  }
+  #keyer button .big { display: block; font-size: 42px; line-height: 1; }
+  #keyer button .sub {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 400;
+    color: #9a9a9a;
+  }
+  #straight { font-size: 22px; letter-spacing: 0.08em; }
+  #keyer button.down {
+    background: #2a0c0c;
+    box-shadow: inset 0 0 28px #e23b3b;
+  }
+  #app.straight #dit, #app.straight #dah { display: none; }
+  #app.paddle #straight { display: none; }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.78);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #overlay[hidden] { display: none; }
+  body:has(#overlay:not([hidden])) #stage { visibility: hidden; }
+  #card {
+    width: min(320px, 100%);
+    background: #000;
+    border: 2px solid #782424;
+    padding: 28px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+  }
+  #overlay-title { margin: 0; font-size: 22px; letter-spacing: 0.04em; }
+  #overlay-text { margin: 0; line-height: 1.45; color: #d0d0d0; }
+  #overlay-btn {
+    background: #000;
+    color: #f2f2f2;
+    border: 2px solid #e23b3b;
+    font: inherit;
+    letter-spacing: 0.04em;
+    padding: 8px 18px;
+    cursor: pointer;
+  }
+  #unlock-card {
+    background: #000;
+    color: #ddd;
+    border: 2px solid #555;
+    font: inherit;
+    padding: 8px 18px;
+    cursor: pointer;
+  }
+  #about, #pick {
+    position: fixed;
+    inset: 0;
+    z-index: 7;
+    overflow: auto;
+    background: #000;
+    color: #f2f2f2;
+    padding: 56px 20px 40px;
+  }
+  #about[hidden], #pick[hidden] { display: none; }
+  #about .wrap, #pick .wrap { max-width: 38rem; margin: 0 auto; }
+  #about h1, #pick h1 { margin: 0 0 0.6em; font-size: 22px; font-weight: 700; letter-spacing: 0.03em; }
+  #about h2, #pick h2 { margin: 1.3em 0 0.35em; font-size: 15px; font-weight: 700; color: #ffb4b4; }
+  #about p, #pick p { margin: 0 0 0.7em; line-height: 1.5; color: #d5d5d5; }
+  #about-back, #pick-back { margin-bottom: 16px; }
+  #pick-levels, #pick-chars, #pick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #pick-levels button, #pick-actions button {
+    background: #000;
+    color: #ddd;
+    border: 2px solid #333;
+    font: inherit;
+    min-width: 2.6rem;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  #pick-levels button.on { border-color: #e23b3b; color: #ffc8c8; }
+  #pick-chars { margin-top: 14px; }
+  #pick-chars label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 3.4rem;
+    border: 2px solid #333;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  #pick-chars label.on { border-color: #e23b3b; color: #ffc8c8; }
+  #pick-start { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  #pick-go, #pick-exam {
+    background: #000;
+    color: #f2f2f2;
+    border: 2px solid #e23b3b;
+    font: inherit;
+    letter-spacing: 0.04em;
+    padding: 8px 18px;
+    cursor: pointer;
+  }
+  #pick-go:disabled, #pick-exam:disabled { border-color: #333; color: #666; cursor: default; }
+  button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    #app.playing #mark i { animation: none; height: 18px; }
+  }
+</style>
+</head>
+<body>
+<a id="sibling" href="../">Słuchaj</a>
+<nav id="lang">
+  <button type="button" data-lang="pl">Polski</button>
+  <button type="button" data-lang="de">Deutsch</button>
+  <button type="button" data-lang="en">English</button>
+</nav>
+<div id="app" class="straight">
+  <header>
+    <button type="button" id="reset" title="Wyzeruj postęp">↺</button>
+    <div id="mode">Poziom 1</div>
+    <div id="left" aria-live="polite"></div>
+  </header>
+  <main>
+    <div id="stage">
+      <p id="prompt">Nadaj ten znak</p>
+      <p id="target"></p>
+      <div id="crib"></div>
+      <div id="trace" aria-live="polite"></div>
+      <p id="compare"></p>
+      <button type="button" id="hear">Posłuchaj</button>
+      <div id="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </main>
+  <button type="button" id="options-toggle" aria-expanded="true">Opcje ▾</button>
+  <div id="options">
+  <div id="tools">
+    <div id="key-mode">
+      <button type="button" id="mode-straight">Prosty</button>
+      <button type="button" id="mode-paddle">Manipulator</button>
+    </div>
+    <label><input type="checkbox" id="sound-bad" checked><span id="sound-bad-label">Dźwięk błędu</span></label>
+    <label><input type="checkbox" id="sound-ok"><span id="sound-ok-label">Dźwięk trafienia</span></label>
+    <label><input type="checkbox" id="hide-map"><span id="hide-map-label">Ukryj mapowanie</span></label>
+    <label><input type="checkbox" id="wide-keys"><span id="wide-keys-label">Klucz na całą szerokość</span></label>
+    <button type="button" id="pick-open">Wybierz znaki</button>
+    <button type="button" id="about-open">O metodzie</button>
+    <button type="button" id="unlock">Odblokuj wszystko</button>
+  </div>
+  <div id="speed">
+    <label><span id="speed-label">Znaki</span>
+      <input id="char-wpm" type="range" min="5" max="40" value="20" step="1">
+      <span id="char-val">20</span> <span class="wpm-unit">WPM</span>
+    </label>
+    <label><span id="gap-label">Przerwa</span>
+      <input id="gap" type="range" min="5" max="40" value="10" step="1">
+      <span id="gap-val">10</span> <span class="wpm-unit">WPM</span>
+    </label>
+  </div>
+  <p id="keymap">Spacja — klucz prosty. ← kropka, → kreska.</p>
+  </div>
+  <div id="keyer">
+    <button type="button" id="straight" aria-pressed="false">klucz</button>
+    <button type="button" id="dit" aria-pressed="false"><span class="big">·</span><span class="sub" id="dit-label">← kropka</span></button>
+    <button type="button" id="dah" aria-pressed="false"><span class="big">–</span><span class="sub" id="dah-label">→ kreska</span></button>
+  </div>
+</div>
+<div id="overlay">
+  <div id="card">
+    <p id="overlay-title">Morse</p>
+    <p id="overlay-text">Nadaj znak kluczem.</p>
+    <button type="button" id="overlay-btn">Start</button>
+    <button type="button" id="unlock-card">Odblokuj wszystko</button>
+    <button type="button" class="link" id="pick-card">Wybierz znaki</button>
+    <button type="button" class="link" id="about-card">O metodzie</button>
+  </div>
+</div>
+<article id="about" hidden>
+  <div class="wrap">
+    <button type="button" id="about-back">Wróć</button>
+    <h1 id="about-title"></h1>
+    <div id="about-body"></div>
+  </div>
+</article>
+<article id="pick" hidden>
+  <div class="wrap">
+    <button type="button" id="pick-back">Wróć</button>
+    <h1 id="pick-title">Co ćwiczyć</h1>
+    <p id="pick-hint"></p>
+    <h2 id="pick-levels-label">Poziomy</h2>
+    <div id="pick-levels"></div>
+    <div id="pick-actions">
+      <button type="button" id="pick-all">Wszystkie</button>
+      <button type="button" id="pick-clear">Wyczyść</button>
+    </div>
+    <div id="pick-chars"></div>
+    <div id="pick-start">
+      <button type="button" id="pick-go">Ćwicz</button>
+      <button type="button" id="pick-exam">Egzamin</button>
+    </div>
+  </div>
+</article>
+<script>
+"use strict";
+
+const FREQ = 680;
+const CHAR_MIN = 5;
+const CHAR_MAX = 40;
+const STORAGE = "morse-koch-tx";
+const BOUNCE = 0.3;
+const DIT_DAH = 2;
+const STRAIGHT_GAP = 2;
+const LETTER_GAP = 3;
+const KOCH = [
+  "K", "M", "U", "R", "E", "S", "N", "A", "P", "T",
+  "L", "W", "I", ".", "J", "Z", "=", "F", "O", "Y",
+  ",", "V", "G", "5", "/", "Q", "9", "2", "H", "3",
+  "8", "B", "?", "4", "7", "C", "1", "D", "6", "0",
+  "X"
+];
+const MORSE = {
+  A: ".-", B: "-...", C: "-.-.", D: "-..", E: ".", F: "..-.",
+  G: "--.", H: "....", I: "..", J: ".---", K: "-.-", L: ".-..",
+  M: "--", N: "-.", O: "---", P: ".--.", Q: "--.-", R: ".-.",
+  S: "...", T: "-", U: "..-", V: "...-", W: ".--", X: "-..-",
+  Y: "-.--", Z: "--..",
+  "1": ".----", "2": "..---", "3": "...--", "4": "....-", "5": ".....",
+  "6": "-....", "7": "--...", "8": "---..", "9": "----.", "0": "-----",
+  ".": ".-.-.-", ",": "--..--", "?": "..--..", "/": "-..-.", "=": "-...-"
+};
+
+for (const ch of KOCH) {
+  if (!MORSE[ch]) throw new Error("brak morsa: " + ch);
+}
+
+const COPY = {
+  pl: {
+    title: "Morse · nadawanie",
+    listen: "Słuchaj",
+    prompt: "Nadaj ten znak",
+    hear: "Posłuchaj",
+    soundBad: "Dźwięk błędu",
+    soundOk: "Dźwięk trafienia",
+    hideMap: "Ukryj mapowanie",
+    wideKeys: "Klucz na całą szerokość",
+    options: "Opcje",
+    straight: "Prosty",
+    paddle: "Manipulator",
+    straightKey: "klucz",
+    ditKey: "← kropka",
+    dahKey: "→ kreska",
+    keymap: "Spacja — klucz prosty. ← kropka, → kreska.",
+    about: "O metodzie",
+    unlock: "Odblokuj wszystko",
+    pick: "Wybierz znaki",
+    pickTitle: "Co ćwiczyć",
+    pickHint: "Poziom Kocha zaznacza pierwsze znaki z tej kolejności. Potem możesz odhaczyć pojedyncze.",
+    levels: "Poziomy",
+    allChars: "Wszystkie",
+    clearChars: "Wyczyść",
+    drillGo: "Ćwicz",
+    picked: "Wybrane",
+    speed: "Znaki",
+    gap: "Przerwa",
+    wpm: "WPM",
+    resetTitle: "Wyzeruj postęp",
+    confirm: "tak?",
+    level: "Poziom {n}",
+    exam: "Egzamin",
+    practice: "Powtórka",
+    fullSet: "Cały zestaw",
+    left: "zostało {n}",
+    start: "Start",
+    startText: "Poziom {n}. Nadaj znak kluczem.",
+    examText: "{n} znaków, bez kodu na ekranie.",
+    doneText: "Wszystkie znaki są już otwarte.",
+    practiceBtn: "Ćwicz",
+    pass: "Zaliczone",
+    fail: "Poniżej 90%",
+    again: "Jeszcze raz",
+    next: "Dalej",
+    failText: "{ratio} · próg to 90%",
+    examNext: "{ratio} · teraz egzamin, bez kodu",
+    newChar: "{ratio} · nowy znak {ch}  {morse}",
+    fullResult: "{ratio} · cały zestaw",
+    back: "Wróć",
+    missLine: "wyszło {got}  /  ma być {want}",
+    aboutTitle: "Dlaczego tak, a nie z tabelki",
+    aboutSections: [
+      ["Tempo, którego nie trzeba oduczać", "Ludwig Koch w 1936 roku kazał nadawać od razu w tempie, w którym znak idzie na paśmie. Kreska rozciągnięta na pół sekundy to nie ta kreska, którą ręka ma zrobić przy 20 WPM. Kto nauczy się wolno, potem miesiące prostuje rytm."],
+      ["Rozciąga się cisza, nie znak", "Domyślnie kropka trwa 60 ms. Kreska trzy razy tyle, przerwa wewnątrz znaku tyle co kropka. To jest 20 WPM. Suwak „Znaki” idzie od 5 do 40 WPM i według niego oceniamy długość. Suwak „Przerwa” zmienia tylko ciszę między kolejnymi zadaniami."],
+      ["Jeden nowy znak", "Na starcie są dwa znaki. Kolejny dochodzi, gdy runda zamyka się na co najmniej 90%. Nowy wraca częściej niż starsze, więc ręka łapie go od razu, a starych nie gubi."],
+      ["Najpierw ściąga, potem bez niej", "W nauce widać literę i kod, można posłuchać wzoru. Co cztery nowe znaki jest egzamin: zostaje sama litera. Ściąga znika, zostaje to, co ręka umie nadać."],
+      ["Klucz", "Klucz prosty to spacja albo duży przycisk: jak długo trzymasz, taka kropka albo kreska. Manipulator to strzałka w lewo i w prawo, albo dwa przyciski: aplikacja robi długość, Ty kolejność. Przytrzymanie powtarza element, oba naraz przeplatają. Arduino ma wysyłać wciśnięcie i puszczenie (Keyboard.press i release), nie znak wpisany do pola. Płytka musi zgłaszać się jako klawiatura USB."]
+    ]
+  },
+  de: {
+    title: "Morse · Geben",
+    listen: "Hören",
+    prompt: "Gib dieses Zeichen",
+    hear: "Anhören",
+    soundBad: "Ton bei Fehler",
+    soundOk: "Ton bei Treffer",
+    hideMap: "Zuordnung ausblenden",
+    wideKeys: "Taste auf volle Breite",
+    options: "Optionen",
+    straight: "Handtaste",
+    paddle: "Paddle",
+    straightKey: "Taste",
+    ditKey: "← Punkt",
+    dahKey: "→ Strich",
+    keymap: "Leertaste — Handtaste. ← Punkt, → Strich.",
+    about: "Zur Methode",
+    unlock: "Alles freischalten",
+    pick: "Zeichen wählen",
+    pickTitle: "Was üben",
+    pickHint: "Eine Koch-Stufe markiert die ersten Zeichen dieser Reihe. Danach kannst du einzelne abwählen.",
+    levels: "Stufen",
+    allChars: "Alle",
+    clearChars: "Leeren",
+    drillGo: "Üben",
+    picked: "Auswahl",
+    speed: "Zeichen",
+    gap: "Pause",
+    wpm: "WpM",
+    resetTitle: "Fortschritt löschen",
+    confirm: "ja?",
+    level: "Stufe {n}",
+    exam: "Prüfung",
+    practice: "Übung",
+    fullSet: "Ganzer Satz",
+    left: "noch {n}",
+    start: "Start",
+    startText: "Stufe {n}. Gib das Zeichen mit der Taste.",
+    examText: "{n} Zeichen, ohne Code auf dem Schirm.",
+    doneText: "Alle Zeichen sind frei.",
+    practiceBtn: "Üben",
+    pass: "Bestanden",
+    fail: "Unter 90%",
+    again: "Noch einmal",
+    next: "Weiter",
+    failText: "{ratio} · Grenze ist 90%",
+    examNext: "{ratio} · jetzt die Prüfung, ohne Code",
+    newChar: "{ratio} · neues Zeichen {ch}  {morse}",
+    fullResult: "{ratio} · ganzer Satz",
+    back: "Zurück",
+    missLine: "gesendet {got}  /  soll {want}",
+    aboutTitle: "Warum so, und nicht mit einer Tabelle",
+    aboutSections: [
+      ["Tempo, das man nicht wieder verlernen muss", "Ludwig Koch hat 1936 das Geben gleich im Tempo geübt, in dem ein Zeichen auf dem Band läuft. Ein Strich, der eine halbe Sekunde dauert, ist nicht der Strich bei 20 WpM. Wer langsam gibt, korrigiert den Rhythmus danach monatelang."],
+      ["Die Pause wird länger, nicht das Zeichen", "Voreingestellt dauert ein Punkt 60 ms. Ein Strich dreimal so lang, die Lücke im Zeichen so lang wie ein Punkt. Das sind 20 WpM. Der Regler „Zeichen“ geht von 5 bis 40 WpM, und daran messen wir die Länge. „Pause“ ändert nur die Stille zwischen den Aufgaben."],
+      ["Ein neues Zeichen", "Am Anfang sind es zwei. Das nächste kommt dazu, wenn eine Runde mindestens 90% erreicht. Das neue kommt öfter als die alten."],
+      ["Erst die Vorlage, dann ohne", "In der Übung siehst du Buchstabe und Code und kannst das Muster hören. Alle vier neuen Zeichen kommt die Prüfung: nur der Buchstabe. Die Vorlage ist weg."],
+      ["Die Taste", "Die Handtaste ist die Leertaste oder der große Knopf: wie lange du hältst, so lang ist Punkt oder Strich. Das Paddle ist Pfeil links und Pfeil rechts, oder zwei Knöpfe: die App macht die Länge, du die Reihenfolge. Halten wiederholt das Element, beide zusammen wechseln sich ab. Ein Arduino schickt Drücken und Loslassen (Keyboard.press und release), kein Zeichen in ein Textfeld. Die Platine muss sich als USB-Tastatur melden."]
+    ]
+  },
+  en: {
+    title: "Morse · send",
+    listen: "Listen",
+    prompt: "Send this character",
+    hear: "Hear it",
+    soundBad: "Sound on a miss",
+    soundOk: "Sound on a hit",
+    hideMap: "Hide mapping",
+    wideKeys: "Expand the key",
+    options: "Options",
+    straight: "Straight",
+    paddle: "Paddle",
+    straightKey: "key",
+    ditKey: "← dit",
+    dahKey: "→ dah",
+    keymap: "Space — straight key. ← dit, → dah.",
+    about: "The method",
+    unlock: "Unlock all",
+    pick: "Choose characters",
+    pickTitle: "What to practice",
+    pickHint: "A Koch level checks the first characters in this order. Then you can untick any of them.",
+    levels: "Levels",
+    allChars: "All",
+    clearChars: "Clear",
+    drillGo: "Practice",
+    picked: "Selection",
+    speed: "Characters",
+    gap: "Gap",
+    wpm: "WPM",
+    resetTitle: "Reset progress",
+    confirm: "yes?",
+    level: "Level {n}",
+    exam: "Exam",
+    practice: "Practice",
+    fullSet: "Full set",
+    left: "{n} left",
+    start: "Start",
+    startText: "Level {n}. Send the character on the key.",
+    examText: "{n} characters, no code on the screen.",
+    doneText: "Every character is unlocked.",
+    practiceBtn: "Practice",
+    pass: "Passed",
+    fail: "Below 90%",
+    again: "Again",
+    next: "Next",
+    failText: "{ratio} · the bar is 90%",
+    examNext: "{ratio} · exam next, no code",
+    newChar: "{ratio} · new character {ch}  {morse}",
+    fullResult: "{ratio} · full set",
+    back: "Back",
+    missLine: "sent {got}  /  wanted {want}",
+    aboutTitle: "Why this way, not a chart",
+    aboutSections: [
+      ["A speed you never have to unlearn", "In 1936 Ludwig Koch had people send at the speed a character has on the air. A dash stretched to half a second is not the dash your hand should make at 20 WPM. Learn it slow, and you spend months fixing the rhythm."],
+      ["The silence stretches, not the character", "By default a dot lasts 60 ms. A dash is three times that, and the gap inside the character matches a dot. That is 20 WPM. The Characters slider runs from 5 to 40 WPM, and that is the length we judge. Gap changes only the silence between prompts."],
+      ["One new character", "You start with two. The next one arrives when a round reaches at least 90%. The new one comes back more often than the old ones."],
+      ["A crib, then no crib", "In practice you see the letter and the code, and you can hear the pattern. Every four new characters there is an exam: the letter alone. The crib is gone."],
+      ["The key", "The straight key is the space bar or the big button: how long you hold is the dot or the dash. The paddle is left arrow and right arrow, or two buttons: the app makes the length, you make the order. Hold to repeat an element; both together alternate. An Arduino sends key down and key up (Keyboard.press and release), not a character typed into a field. The board has to show up as a USB keyboard."]
+    ]
+  }
+};
+
+function fill(s, vars) {
+  if (!vars) return s;
+  return s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] == null ? "" : String(vars[k])));
+}
+
+function t(key, vars) {
+  const pack = COPY[state.lang] || COPY.pl;
+  return fill(pack[key] != null ? pack[key] : COPY.pl[key], vars);
+}
+
+const app = document.getElementById("app");
+const modeEl = document.getElementById("mode");
+const leftEl = document.getElementById("left");
+const promptEl = document.getElementById("prompt");
+const targetEl = document.getElementById("target");
+const cribEl = document.getElementById("crib");
+const traceEl = document.getElementById("trace");
+const compareEl = document.getElementById("compare");
+const hearBtn = document.getElementById("hear");
+const resetBtn = document.getElementById("reset");
+const gapInput = document.getElementById("gap");
+const gapVal = document.getElementById("gap-val");
+const charInput = document.getElementById("char-wpm");
+const charVal = document.getElementById("char-val");
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlay-title");
+const overlayText = document.getElementById("overlay-text");
+const overlayBtn = document.getElementById("overlay-btn");
+const unlockBtn = document.getElementById("unlock");
+const unlockCard = document.getElementById("unlock-card");
+const aboutOpen = document.getElementById("about-open");
+const aboutCard = document.getElementById("about-card");
+const aboutEl = document.getElementById("about");
+const aboutBack = document.getElementById("about-back");
+const aboutTitle = document.getElementById("about-title");
+const aboutBody = document.getElementById("about-body");
+const pickOpen = document.getElementById("pick-open");
+const pickCard = document.getElementById("pick-card");
+const pickEl = document.getElementById("pick");
+const pickBack = document.getElementById("pick-back");
+const pickTitle = document.getElementById("pick-title");
+const pickHint = document.getElementById("pick-hint");
+const pickLevelsLabel = document.getElementById("pick-levels-label");
+const pickLevels = document.getElementById("pick-levels");
+const pickChars = document.getElementById("pick-chars");
+const pickAll = document.getElementById("pick-all");
+const pickClear = document.getElementById("pick-clear");
+const pickGo = document.getElementById("pick-go");
+const pickExam = document.getElementById("pick-exam");
+const straightModeBtn = document.getElementById("mode-straight");
+const paddleModeBtn = document.getElementById("mode-paddle");
+const langBar = document.getElementById("lang");
+const sibling = document.getElementById("sibling");
+const keymapEl = document.getElementById("keymap");
+const straightBtn = document.getElementById("straight");
+const ditBtn = document.getElementById("dit");
+const dahBtn = document.getElementById("dah");
+
+const PARTS = ["straight", "dit", "dah"];
+const ptrs = { straight: new Set(), dit: new Set(), dah: new Set() };
+const kb = { straight: false, dit: false, dah: false };
+const active = { straight: false, dit: false, dah: false };
+
+let state = load();
+let queue = [];
+let roundMode = "";
+let phase = "overlay";
+let overlayView = null;
+let correct = 0;
+let total = 0;
+let current = "";
+let pattern = "";
+let shown = "";
+let accept = false;
+let suppress = false;
+let downAt = 0;
+let keyerBusy = false;
+let keyerGen = 0;
+let memory = "";
+let prev = "";
+let ditLatch = false;
+let dahLatch = false;
+let endTimer = 0;
+let letterTimer = 0;
+let keyerTimer = 0;
+let timer = 0;
+let liveRaf = 0;
+let resetArm = 0;
+let ctx = null;
+let osc = null;
+let gain = null;
+let sampleOsc = null;
+let sampleId = 0;
+let sampleOn = false;
+let toneEndsAt = 0;
+
+function isGate(count) {
+  return count >= 6 && (count - 2) % 4 === 0;
+}
+
+function passed(ok, n) {
+  return n > 0 && ok * 10 >= n * 9;
+}
+
+function shuffle(list) {
+  const arr = list.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+function lessonQueue(list) {
+  const newest = list[list.length - 1];
+  const older = list.slice(0, -1);
+  const out = [];
+  for (let i = 0; i < 10; i++) {
+    const pick = older.length && Math.random() >= 0.5
+      ? older[Math.floor(Math.random() * older.length)]
+      : newest;
+    out.push({ char: pick, retry: false });
+  }
+  return out;
+}
+
+function examQueue(list) {
+  const order = shuffle(list.slice());
+  const bag = [];
+  for (let i = 0; i < 20; i++) bag.push({ char: order[i % order.length], retry: false });
+  return shuffle(bag);
+}
+
+function drillQueue(list) {
+  const order = shuffle(list.slice());
+  const bag = [];
+  for (let i = 0; i < 10; i++) bag.push({ char: order[i % order.length], retry: false });
+  return shuffle(bag);
+}
+
+function chars() {
+  return KOCH.slice(0, state.count);
+}
+
+const KOCH_LEVELS = [2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 41];
+
+function cleanDrill(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const ch of raw) {
+    if (typeof ch !== "string" || !MORSE[ch] || seen.has(ch)) continue;
+    seen.add(ch);
+    out.push(ch);
+  }
+  out.sort((a, b) => KOCH.indexOf(a) - KOCH.indexOf(b));
+  return out;
+}
+
+function load() {
+  const def = {
+    count: 2, pendingExam: false, finished: false,
+    charWpm: 20, gapWpm: 10,
+    soundBad: true, soundOk: false, hideMap: false, wideKeys: false, optionsOpen: true,
+    lang: "pl", drill: [], keyMode: "straight"
+  };
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE) || "null");
+    if (!raw) return def;
+    const count = Math.round(Number(raw.count));
+    if (!(count >= 2 && count <= KOCH.length)) return def;
+    const charWpm = clamp(Math.round(Number(raw.charWpm) || 20), CHAR_MIN, CHAR_MAX);
+    let gapWpm = clamp(Math.round(Number(raw.gapWpm) || 10), CHAR_MIN, CHAR_MAX);
+    if (gapWpm > charWpm) gapWpm = charWpm;
+    const pendingExam = Boolean(raw.pendingExam) && isGate(count);
+    const finished = Boolean(raw.finished) && count === KOCH.length && !pendingExam;
+    const lang = raw.lang === "de" || raw.lang === "en" ? raw.lang : "pl";
+    const keyMode = raw.keyMode === "paddle" ? "paddle" : "straight";
+    return {
+      count, pendingExam, finished, charWpm, gapWpm,
+      soundBad: raw.soundBad === undefined ? true : Boolean(raw.soundBad),
+      soundOk: Boolean(raw.soundOk),
+      hideMap: Boolean(raw.hideMap),
+      wideKeys: Boolean(raw.wideKeys),
+      optionsOpen: raw.optionsOpen === undefined ? true : Boolean(raw.optionsOpen),
+      lang, drill: cleanDrill(raw.drill), keyMode
+    };
+  } catch (err) {
+    return def;
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE, JSON.stringify(state));
+  } catch (err) {}
+}
+
+function clamp(n, lo, hi) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function unit() {
+  return 1.2 / state.charWpm;
+}
+
+function glyphs(s) {
+  return s.replace(/\./g, "·").replace(/-/g, "–");
+}
+
+function interCharSec(effectiveWpm) {
+  const c = state.charWpm;
+  const s = clamp(effectiveWpm, CHAR_MIN, c);
+  const dit = 1.2 / c;
+  if (s >= c) return 3 * dit;
+  const space = 60 / s - 37.2 / c;
+  return (3 / 19) * space;
+}
+
+function audioCtx() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error("no audio");
+    ctx = new AC();
+  }
+  return ctx;
+}
+
+function unlockAnd(fn) {
+  let actx;
+  try {
+    actx = audioCtx();
+  } catch (err) {
+    fn();
+    return;
+  }
+  const resume = actx.resume();
+  if (resume && typeof resume.then === "function") resume.then(fn, fn);
+  else fn();
+}
+
+function pokeAudio() {
+  try {
+    const actx = audioCtx();
+    if (actx.state === "suspended") actx.resume();
+  } catch (err) {}
+}
+
+function ensureOsc(actx) {
+  if (osc) return;
+  osc = actx.createOscillator();
+  gain = actx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = FREQ;
+  gain.gain.value = 0;
+  osc.connect(gain);
+  gain.connect(actx.destination);
+  osc.start();
+}
+
+function syncLamp() {
+  app.classList.toggle("playing", (!!downAt && phase === "ask") || keyerBusy || sampleOn);
+}
+
+function tone(on) {
+  if (!on && (!ctx || !gain)) {
+    syncLamp();
+    return;
+  }
+  let actx;
+  try {
+    actx = audioCtx();
+  } catch (err) {
+    return;
+  }
+  ensureOsc(actx);
+  const t = actx.currentTime;
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.setValueAtTime(gain.gain.value, t);
+  gain.gain.linearRampToValueAtTime(on ? 0.22 : 0, t + 0.005);
+  syncLamp();
+}
+
+function schedulePulse(dur) {
+  let actx;
+  try {
+    actx = audioCtx();
+  } catch (err) {
+    return;
+  }
+  ensureOsc(actx);
+  const t = actx.currentTime;
+  const edge = Math.min(0.004, dur / 4);
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(0.22, t + edge);
+  gain.gain.setValueAtTime(0.22, t + Math.max(edge, dur - edge));
+  gain.gain.linearRampToValueAtTime(0, t + dur);
+}
+
+function stopSample() {
+  sampleId += 1;
+  sampleOn = false;
+  if (sampleOsc) {
+    try { sampleOsc.stop(); } catch (err) {}
+    sampleOsc = null;
+  }
+  syncLamp();
+}
+
+function playPattern(symbols, delaySec) {
+  stopSample();
+  let actx;
+  try {
+    actx = audioCtx();
+  } catch (err) {
+    toneEndsAt = 0;
+    return;
+  }
+  const id = ++sampleId;
+  sampleOn = true;
+  syncLamp();
+  const dit = unit();
+  const t0 = actx.currentTime + 0.03 + (delaySec || 0);
+  const o = actx.createOscillator();
+  const g = actx.createGain();
+  o.type = "sine";
+  o.frequency.value = FREQ;
+  g.gain.setValueAtTime(0, actx.currentTime);
+  o.connect(g);
+  g.connect(actx.destination);
+  let t = t0;
+  for (let i = 0; i < symbols.length; i++) {
+    const dur = symbols[i] === "-" ? dit * 3 : dit;
+    const edge = Math.min(0.004, dur / 4);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22, t + edge);
+    g.gain.setValueAtTime(0.22, t + dur - edge);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    t += dur;
+    if (i !== symbols.length - 1) t += dit;
+  }
+  o.start(t0);
+  o.stop(t + 0.02);
+  sampleOsc = o;
+  toneEndsAt = t;
+  setTimeout(() => {
+    if (id !== sampleId) return;
+    sampleOn = false;
+    sampleOsc = null;
+    syncLamp();
+  }, Math.max(0, (t - actx.currentTime) * 1000));
+}
+
+function blip(freq, when, dur, type, peak) {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, when);
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(peak, when + 0.008);
+  g.gain.linearRampToValueAtTime(0, when + dur);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(when);
+  o.stop(when + dur + 0.02);
+}
+
+function playResult(ok) {
+  if (!ctx) return;
+  if (ok ? !state.soundOk : !state.soundBad) return;
+  const when = ctx.currentTime + 0.02;
+  if (ok) {
+    blip(740, when, 0.07, "sine", 0.12);
+    blip(1040, when + 0.08, 0.1, "sine", 0.1);
+  } else {
+    blip(196, when, 0.1, "square", 0.05);
+    blip(130, when + 0.11, 0.16, "square", 0.06);
+  }
+}
+
+function delayUntilNext(feedbackMs) {
+  const gap = interCharSec(state.gapWpm) * 1000;
+  let audioWait = 0;
+  if (ctx) audioWait = Math.max(0, (toneEndsAt + 0.05 - ctx.currentTime) * 1000);
+  return Math.max(feedbackMs, gap, audioWait);
+}
+
+function renderHeader() {
+  let label = t("level", { n: state.count - 1 });
+  if (roundMode === "exam" || roundMode === "drillExam" || (phase === "overlay" && state.pendingExam && roundMode !== "drill" && roundMode !== "practice")) label = t("exam");
+  if (roundMode === "practice") label = t("practice");
+  if (roundMode === "drill") label = t("picked");
+  if (state.finished && roundMode !== "lesson" && roundMode !== "exam" && roundMode !== "practice" && roundMode !== "drill" && roundMode !== "drillExam") label = t("fullSet");
+  modeEl.textContent = label;
+  const live = phase === "ask" || phase === "feedback";
+  leftEl.textContent = live ? t("left", { n: queue.length }) : "";
+}
+
+function renderBars(el, symbols) {
+  el.replaceChildren();
+  for (const sym of symbols) {
+    const bar = document.createElement("i");
+    bar.className = sym === "-" ? "dah" : "dit";
+    el.appendChild(bar);
+  }
+}
+
+function renderTrace() {
+  const symbols = phase === "feedback" ? shown : pattern;
+  traceEl.replaceChildren();
+  for (const sym of symbols) {
+    const bar = document.createElement("i");
+    bar.className = sym === "-" ? "dah" : "dit";
+    traceEl.appendChild(bar);
+  }
+  if (phase === "ask" && downAt) {
+    const units = ((performance.now() - downAt) / 1000) / unit();
+    const bar = document.createElement("i");
+    bar.className = "live";
+    bar.style.width = Math.max(2, Math.min(52, units * 10)) + "px";
+    traceEl.appendChild(bar);
+  }
+}
+
+function renderPrompt() {
+  const examAsk = (roundMode === "exam" || roundMode === "drillExam") && phase === "ask";
+  const hideCrib = !current || examAsk || (state.hideMap && phase === "ask");
+  targetEl.textContent = current;
+  cribEl.hidden = hideCrib;
+  hearBtn.hidden = examAsk || !current;
+  if (!hideCrib && current) renderBars(cribEl, MORSE[current]);
+  else if (hideCrib) cribEl.replaceChildren();
+}
+
+function stopLoop() {
+  cancelAnimationFrame(liveRaf);
+  liveRaf = 0;
+}
+
+function startLoop() {
+  stopLoop();
+  const tick = () => {
+    if (!downAt) return;
+    renderTrace();
+    liveRaf = requestAnimationFrame(tick);
+  };
+  liveRaf = requestAnimationFrame(tick);
+}
+
+function cancelAttempt() {
+  keyerGen += 1;
+  clearTimeout(endTimer);
+  clearTimeout(letterTimer);
+  clearTimeout(keyerTimer);
+  keyerBusy = false;
+  memory = "";
+  prev = "";
+  ditLatch = false;
+  dahLatch = false;
+  downAt = 0;
+  pattern = "";
+  stopLoop();
+  tone(false);
+  stopSample();
+}
+
+function clearPhysical() {
+  suppress = true;
+  for (const which of PARTS) {
+    ptrs[which].clear();
+    kb[which] = false;
+    recompute(which);
+  }
+  suppress = false;
+  ditLatch = false;
+  dahLatch = false;
+}
+
+function dropHolds() {
+  clearPhysical();
+  cancelAttempt();
+}
+
+function armStraightEnd() {
+  clearTimeout(endTimer);
+  if (phase !== "ask" || !pattern) return;
+  const dit = unit();
+  const gen = keyerGen;
+  endTimer = setTimeout(() => {
+    if (gen !== keyerGen || phase !== "ask" || active.straight) return;
+    finishChar();
+  }, dit * STRAIGHT_GAP * 1000);
+}
+
+function straightDown() {
+  clearTimeout(endTimer);
+  downAt = performance.now();
+  tone(true);
+  startLoop();
+}
+
+function straightUp() {
+  const started = downAt;
+  downAt = 0;
+  stopLoop();
+  tone(false);
+  if (phase !== "ask" || !accept || !started) return;
+  const dur = (performance.now() - started) / 1000;
+  const dit = unit();
+  if (dur >= dit * BOUNCE) {
+    pattern += dur < dit * DIT_DAH ? "." : "-";
+    if (pattern.length >= 8) {
+      finishChar();
+      return;
+    }
+  }
+  renderTrace();
+  armStraightEnd();
+}
+
+function choosePaddle() {
+  const dit = active.dit || ditLatch;
+  const dah = active.dah || dahLatch;
+  ditLatch = false;
+  dahLatch = false;
+  if (dit && dah) {
+    const sym = prev === "." ? "-" : ".";
+    memory = sym === "." ? "-" : ".";
+    return sym;
+  }
+  if (dit) {
+    memory = "";
+    return ".";
+  }
+  if (dah) {
+    memory = "";
+    return "-";
+  }
+  if (memory) {
+    const sym = memory;
+    memory = "";
+    return sym;
+  }
+  return "";
+}
+
+function armLetter() {
+  clearTimeout(letterTimer);
+  const dit = unit();
+  const gen = keyerGen;
+  letterTimer = setTimeout(() => {
+    if (gen !== keyerGen || phase !== "ask" || keyerBusy) return;
+    if (active.dit || active.dah) return;
+    finishChar();
+  }, dit * (LETTER_GAP - 1) * 1000);
+}
+
+function emit(sym) {
+  prev = sym;
+  pattern += sym;
+  renderTrace();
+  const dit = unit();
+  const dur = sym === "-" ? dit * 3 : dit;
+  schedulePulse(dur);
+  syncLamp();
+  const gen = keyerGen;
+  if (pattern.length >= 8) {
+    keyerTimer = setTimeout(() => {
+      if (gen !== keyerGen || phase !== "ask") return;
+      keyerBusy = false;
+      syncLamp();
+      finishChar();
+    }, dur * 1000);
+    return;
+  }
+  keyerTimer = setTimeout(() => {
+    if (gen !== keyerGen || phase !== "ask") return;
+    afterGap();
+  }, (dur + dit) * 1000);
+}
+
+function beginElement() {
+  const sym = choosePaddle();
+  if (!sym) {
+    keyerBusy = false;
+    syncLamp();
+    return;
+  }
+  keyerBusy = true;
+  emit(sym);
+}
+
+function afterGap() {
+  const sym = choosePaddle();
+  if (sym) emit(sym);
+  else {
+    keyerBusy = false;
+    syncLamp();
+    armLetter();
+  }
+}
+
+function paddleDown(which) {
+  if (which === "dit") ditLatch = true;
+  else dahLatch = true;
+  clearTimeout(letterTimer);
+  if (!keyerBusy) beginElement();
+}
+
+function logicalDown(which) {
+  if (suppress || phase !== "ask" || !accept) return;
+  if (!aboutEl.hidden || !pickEl.hidden) return;
+  if (state.keyMode === "straight" && which !== "straight") return;
+  if (state.keyMode === "paddle" && which === "straight") return;
+  pokeAudio();
+  stopSample();
+  if (which === "straight") straightDown();
+  else paddleDown(which);
+}
+
+function logicalUp(which) {
+  if (suppress) return;
+  if (which === "straight") straightUp();
+  else if (phase === "ask") renderTrace();
+}
+
+function recompute(which) {
+  const on = ptrs[which].size > 0 || kb[which];
+  const was = active[which];
+  active[which] = on;
+  const el = document.getElementById(which);
+  el.classList.toggle("down", on);
+  el.setAttribute("aria-pressed", on ? "true" : "false");
+  if (suppress || on === was) return;
+  if (on) logicalDown(which);
+  else logicalUp(which);
+  if (!on && phase === "ask" && !active.straight && !active.dit && !active.dah) accept = true;
+}
+
+function finishChar() {
+  if (phase !== "ask" || !pattern) return;
+  phase = "feedback";
+  accept = false;
+  const got = pattern;
+  const q = queue.shift();
+  keyerGen += 1;
+  clearTimeout(endTimer);
+  clearTimeout(letterTimer);
+  clearTimeout(keyerTimer);
+  keyerBusy = false;
+  memory = "";
+  prev = "";
+  ditLatch = false;
+  dahLatch = false;
+  downAt = 0;
+  pattern = "";
+  stopLoop();
+  tone(false);
+  shown = got;
+  const ok = got === MORSE[q.char];
+  targetEl.classList.toggle("good", ok);
+  targetEl.classList.toggle("bad", !ok);
+  traceEl.classList.toggle("good", ok);
+  traceEl.classList.toggle("bad", !ok);
+  renderTrace();
+  if (!ok) {
+    cribEl.hidden = false;
+    hearBtn.hidden = false;
+    renderBars(cribEl, MORSE[q.char]);
+    compareEl.textContent = t("missLine", { got: glyphs(got), want: glyphs(MORSE[q.char]) });
+    playPattern(MORSE[q.char], 0.28);
+  } else {
+    compareEl.textContent = "";
+  }
+  playResult(ok);
+  total += 1;
+  if (ok) correct += 1;
+  if (!ok && !q.retry && roundMode !== "exam" && roundMode !== "drillExam") {
+    const at = Math.min(queue.length, 2);
+    queue.splice(at, 0, { char: q.char, retry: true });
+  }
+  renderHeader();
+  const wait = delayUntilNext(ok ? 420 : 1100);
+  clearTimeout(timer);
+  timer = setTimeout(ask, wait);
+}
+
+function paintIntro() {
+  const intro = overlayView && (overlayView.kind === "start" || overlayView.kind === "examStart" || overlayView.kind === "done");
+  unlockCard.hidden = !(intro && !state.finished);
+  aboutCard.hidden = !intro;
+  pickCard.hidden = !intro;
+  unlockBtn.hidden = state.finished;
+}
+
+function paintOverlay() {
+  if (!overlayView) return;
+  const v = overlayView.vars;
+  let title = "Morse";
+  let text = "";
+  let button = t("next");
+  if (overlayView.kind === "start") {
+    text = t("startText", v);
+    button = t("start");
+  } else if (overlayView.kind === "examStart") {
+    title = t("exam");
+    text = t("examText", v);
+    button = t("start");
+  } else if (overlayView.kind === "done") {
+    title = t("fullSet");
+    text = t("doneText");
+    button = t("practiceBtn");
+  } else if (overlayView.kind === "fail") {
+    title = t("fail");
+    text = t("failText", v);
+    button = t("again");
+  } else if (overlayView.kind === "passExam") {
+    title = t("pass");
+    text = t("examNext", v);
+  } else if (overlayView.kind === "passDone" || overlayView.kind === "practice") {
+    title = v.pass ? t("pass") : t("fail");
+    text = overlayView.kind === "passDone" ? t("fullResult", v) : v.ratio;
+  } else if (overlayView.kind === "passNew") {
+    title = t("pass");
+    text = t("newChar", v);
+  }
+  overlayTitle.textContent = title;
+  overlayText.textContent = text;
+  overlayBtn.textContent = button;
+  paintIntro();
+}
+
+function showOverlay(kind, vars, action) {
+  overlayView = { kind, vars: vars || {}, action };
+  overlay.hidden = false;
+  phase = "overlay";
+  paintOverlay();
+  renderHeader();
+  overlayBtn.focus();
+}
+
+function hideOverlay() {
+  overlay.hidden = true;
+  if (document.activeElement === overlayBtn) overlayBtn.blur();
+}
+
+function showStart() {
+  roundMode = "";
+  queue = [];
+  current = "";
+  phase = "overlay";
+  clearTimeout(timer);
+  dropHolds();
+  targetEl.textContent = "";
+  targetEl.classList.remove("good", "bad");
+  traceEl.classList.remove("good", "bad");
+  compareEl.textContent = "";
+  renderPrompt();
+  renderTrace();
+  if (state.finished) showOverlay("done", {}, startPractice);
+  else if (state.pendingExam) showOverlay("examStart", { n: state.count }, startExam);
+  else showOverlay("start", { n: state.count - 1 }, startLesson);
+}
+
+function showDone() {
+  roundMode = "";
+  queue = [];
+  current = "";
+  clearTimeout(timer);
+  dropHolds();
+  showOverlay("done", {}, startPractice);
+}
+
+function begin(nextQueue) {
+  queue = nextQueue;
+  correct = 0;
+  total = 0;
+  hideOverlay();
+  ask();
+}
+
+function startLesson() {
+  roundMode = "lesson";
+  begin(lessonQueue(chars()));
+}
+
+function startExam() {
+  roundMode = "exam";
+  begin(examQueue(chars()));
+}
+
+function startPractice() {
+  roundMode = "practice";
+  begin(lessonQueue(chars()));
+}
+
+function ask() {
+  clearTimeout(timer);
+  stopSample();
+  if (!queue.length) {
+    finishRound();
+    return;
+  }
+  phase = "ask";
+  cancelAttempt();
+  accept = !active.straight && !active.dit && !active.dah;
+  current = queue[0].char;
+  shown = "";
+  targetEl.classList.remove("good", "bad");
+  traceEl.classList.remove("good", "bad");
+  compareEl.textContent = "";
+  renderHeader();
+  renderPrompt();
+  renderTrace();
+}
+
+function commit() {
+  if (roundMode === "exam") {
+    state.pendingExam = false;
+    if (state.count < KOCH.length) state.count += 1;
+  } else if (roundMode === "lesson") {
+    if (isGate(state.count)) state.pendingExam = true;
+    else if (state.count < KOCH.length) state.count += 1;
+    else state.finished = true;
+  }
+  save();
+}
+
+function finishRound() {
+  phase = "overlay";
+  clearTimeout(timer);
+  dropHolds();
+  shown = "";
+  targetEl.classList.remove("good", "bad");
+  traceEl.classList.remove("good", "bad");
+  compareEl.textContent = "";
+  renderTrace();
+  const pass = passed(correct, total);
+  if (pass && roundMode !== "practice" && roundMode !== "drill" && roundMode !== "drillExam") commit();
+  const ratio = correct + "/" + total;
+  if (roundMode === "practice" || roundMode === "drill" || roundMode === "drillExam") {
+    showOverlay("practice", { pass, ratio }, showStart);
+  } else if (!pass) {
+    const again = roundMode === "exam" ? startExam : startLesson;
+    showOverlay("fail", { ratio }, again);
+  } else if (state.pendingExam) {
+    showOverlay("passExam", { ratio }, startExam);
+  } else if (state.finished) {
+    showOverlay("passDone", { ratio, pass: true }, showDone);
+  } else {
+    const ch = KOCH[state.count - 1];
+    showOverlay("passNew", { ratio, ch, morse: MORSE[ch] }, startLesson);
+  }
+}
+
+function hear() {
+  if (phase !== "ask" || !current || hearBtn.hidden) return;
+  if (active.straight || active.dit || active.dah || keyerBusy || pattern) return;
+  pokeAudio();
+  playPattern(MORSE[current]);
+}
+
+function doReset() {
+  clearTimeout(timer);
+  dropHolds();
+  state.count = 2;
+  state.pendingExam = false;
+  state.finished = false;
+  save();
+  showStart();
+}
+
+function unlockAll() {
+  clearTimeout(timer);
+  dropHolds();
+  aboutEl.hidden = true;
+  state.count = KOCH.length;
+  state.pendingExam = false;
+  state.finished = true;
+  save();
+  showDone();
+}
+
+function renderAbout() {
+  const pack = COPY[state.lang] || COPY.pl;
+  aboutBack.textContent = pack.back;
+  aboutTitle.textContent = pack.aboutTitle;
+  aboutBody.replaceChildren();
+  for (const section of pack.aboutSections) {
+    const h = document.createElement("h2");
+    h.textContent = section[0];
+    const p = document.createElement("p");
+    p.textContent = section[1];
+    aboutBody.append(h, p);
+  }
+}
+
+function openAbout() {
+  if (phase === "ask") dropHolds();
+  renderAbout();
+  aboutEl.hidden = false;
+  aboutBack.focus();
+}
+
+function closeAbout() {
+  aboutEl.hidden = true;
+  if (phase === "ask") accept = !active.straight && !active.dit && !active.dah;
+}
+
+function selectedChars() {
+  const out = [];
+  for (const input of pickChars.querySelectorAll("input")) {
+    if (input.checked) out.push(input.value);
+  }
+  return out;
+}
+
+function syncPickGo() {
+  const selected = selectedChars();
+  pickGo.disabled = selected.length === 0;
+  pickExam.disabled = selected.length === 0;
+  const prefix = selected.length > 0 && selected.every((ch, i) => ch === KOCH[i]);
+  const match = prefix ? selected.length : 0;
+  for (const btn of pickLevels.querySelectorAll("button")) {
+    btn.classList.toggle("on", Number(btn.dataset.n) === match);
+  }
+}
+
+function setPick(list) {
+  const want = new Set(list);
+  for (const input of pickChars.querySelectorAll("input")) {
+    input.checked = want.has(input.value);
+    input.parentElement.classList.toggle("on", input.checked);
+  }
+  syncPickGo();
+}
+
+function buildPick() {
+  if (pickChars.childElementCount) return;
+  for (const n of KOCH_LEVELS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.n = String(n);
+    btn.textContent = String(n);
+    pickLevels.appendChild(btn);
+  }
+  for (const ch of KOCH) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = ch;
+    const span = document.createElement("span");
+    span.textContent = ch;
+    label.append(input, span);
+    input.addEventListener("change", () => {
+      label.classList.toggle("on", input.checked);
+      syncPickGo();
+    });
+    pickChars.appendChild(label);
+  }
+}
+
+function paintPick() {
+  pickBack.textContent = t("back");
+  pickTitle.textContent = t("pickTitle");
+  pickHint.textContent = t("pickHint");
+  pickLevelsLabel.textContent = t("levels");
+  pickAll.textContent = t("allChars");
+  pickClear.textContent = t("clearChars");
+  pickGo.textContent = t("drillGo");
+  pickExam.textContent = t("exam");
+}
+
+function openPick() {
+  if (phase === "ask") dropHolds();
+  buildPick();
+  setPick(state.drill.length ? state.drill : chars());
+  paintPick();
+  pickEl.hidden = false;
+  pickBack.focus();
+}
+
+function closePick() {
+  pickEl.hidden = true;
+  if (phase === "ask") accept = !active.straight && !active.dit && !active.dah;
+}
+
+function beginPicked(mode, exam) {
+  const picked = selectedChars();
+  if (!picked.length) return;
+  state.drill = picked;
+  save();
+  roundMode = mode;
+  pickEl.hidden = true;
+  aboutEl.hidden = true;
+  begin(exam ? examQueue(picked) : drillQueue(picked));
+}
+
+function startDrill() {
+  beginPicked("drill", false);
+}
+
+function startLevelExam() {
+  beginPicked("drillExam", true);
+}
+
+function paintOptions() {
+  const open = state.optionsOpen !== false;
+  document.getElementById("options").hidden = !open;
+  const btn = document.getElementById("options-toggle");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  btn.textContent = t("options") + (open ? " ▾" : " ▸");
+}
+
+function paintWide() {
+  document.body.classList.toggle("wide-keys", state.wideKeys);
+}
+
+function paintKeyMode() {
+  app.classList.toggle("straight", state.keyMode === "straight");
+  app.classList.toggle("paddle", state.keyMode === "paddle");
+  straightModeBtn.classList.toggle("on", state.keyMode === "straight");
+  paddleModeBtn.classList.toggle("on", state.keyMode === "paddle");
+}
+
+function setKeyMode(mode) {
+  if (mode !== "straight" && mode !== "paddle") return;
+  if (state.keyMode === mode) return;
+  state.keyMode = mode;
+  save();
+  if (phase === "ask") {
+    dropHolds();
+    accept = !active.straight && !active.dit && !active.dah;
+    renderTrace();
+  } else clearPhysical();
+  paintKeyMode();
+}
+
+function applyLang() {
+  const pack = COPY[state.lang] || COPY.pl;
+  document.documentElement.lang = state.lang;
+  document.title = pack.title;
+  sibling.textContent = pack.listen;
+  promptEl.textContent = pack.prompt;
+  hearBtn.textContent = pack.hear;
+  document.getElementById("sound-bad-label").textContent = pack.soundBad;
+  document.getElementById("sound-ok-label").textContent = pack.soundOk;
+  document.getElementById("hide-map-label").textContent = pack.hideMap;
+  document.getElementById("wide-keys-label").textContent = pack.wideKeys;
+  paintOptions();
+  paintWide();
+  straightModeBtn.textContent = pack.straight;
+  paddleModeBtn.textContent = pack.paddle;
+  straightBtn.textContent = pack.straightKey;
+  document.getElementById("dit-label").textContent = pack.ditKey;
+  document.getElementById("dah-label").textContent = pack.dahKey;
+  keymapEl.textContent = pack.keymap;
+  aboutOpen.textContent = pack.about;
+  aboutCard.textContent = pack.about;
+  unlockBtn.textContent = pack.unlock;
+  unlockCard.textContent = pack.unlock;
+  pickOpen.textContent = pack.pick;
+  pickCard.textContent = pack.pick;
+  document.getElementById("speed-label").textContent = pack.speed;
+  document.getElementById("gap-label").textContent = pack.gap;
+  for (const unitEl of document.querySelectorAll(".wpm-unit")) unitEl.textContent = pack.wpm;
+  resetBtn.title = pack.resetTitle;
+  if (!resetArm) resetBtn.textContent = "↺";
+  for (const btn of langBar.querySelectorAll("button")) {
+    btn.classList.toggle("on", btn.dataset.lang === state.lang);
+  }
+  renderHeader();
+  if (!overlay.hidden) paintOverlay();
+  if (!aboutEl.hidden) renderAbout();
+  if (!pickEl.hidden) paintPick();
+}
+
+function syncSpeedInputs() {
+  charInput.value = String(state.charWpm);
+  charVal.textContent = String(state.charWpm);
+  gapInput.max = String(state.charWpm);
+  gapInput.value = String(state.gapWpm);
+  gapVal.textContent = String(state.gapWpm);
+}
+
+function whichKey(code) {
+  if (code === "Space") return "straight";
+  if (code === "ArrowLeft") return "dit";
+  if (code === "ArrowRight") return "dah";
+  return "";
+}
+
+function keyUseful(which) {
+  if (which === "straight") return state.keyMode === "straight";
+  return state.keyMode === "paddle";
+}
+
+function bindKey(el, which) {
+  el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    ptrs[which].add(e.pointerId);
+    recompute(which);
+  });
+  const end = (e) => {
+    if (!ptrs[which].has(e.pointerId)) return;
+    ptrs[which].delete(e.pointerId);
+    recompute(which);
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+  el.addEventListener("lostpointercapture", end);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+}
+
+syncSpeedInputs();
+paintKeyMode();
+charInput.addEventListener("input", () => {
+  state.charWpm = clamp(Math.round(Number(charInput.value)), CHAR_MIN, CHAR_MAX);
+  if (state.gapWpm > state.charWpm) state.gapWpm = state.charWpm;
+  syncSpeedInputs();
+  save();
+});
+gapInput.addEventListener("input", () => {
+  state.gapWpm = clamp(Math.round(Number(gapInput.value)), CHAR_MIN, state.charWpm);
+  gapVal.textContent = String(state.gapWpm);
+  save();
+});
+
+resetBtn.addEventListener("click", () => {
+  if (resetArm) {
+    resetArm = 0;
+    resetBtn.classList.remove("armed");
+    resetBtn.textContent = "↺";
+    doReset();
+    return;
+  }
+  resetArm = 1;
+  resetBtn.classList.add("armed");
+  resetBtn.textContent = t("confirm");
+  setTimeout(() => {
+    if (!resetArm) return;
+    resetArm = 0;
+    resetBtn.classList.remove("armed");
+    resetBtn.textContent = "↺";
+  }, 2000);
+});
+
+const soundBadInput = document.getElementById("sound-bad");
+const soundOkInput = document.getElementById("sound-ok");
+soundBadInput.checked = state.soundBad;
+soundOkInput.checked = state.soundOk;
+soundBadInput.addEventListener("change", () => {
+  state.soundBad = soundBadInput.checked;
+  save();
+});
+soundOkInput.addEventListener("change", () => {
+  state.soundOk = soundOkInput.checked;
+  save();
+});
+const hideMapInput = document.getElementById("hide-map");
+const wideKeysInput = document.getElementById("wide-keys");
+hideMapInput.checked = state.hideMap;
+wideKeysInput.checked = state.wideKeys;
+hideMapInput.addEventListener("change", () => {
+  state.hideMap = hideMapInput.checked;
+  save();
+  if (phase === "ask") renderPrompt();
+});
+wideKeysInput.addEventListener("change", () => {
+  state.wideKeys = wideKeysInput.checked;
+  paintWide();
+  save();
+});
+document.getElementById("options-toggle").addEventListener("click", () => {
+  state.optionsOpen = !state.optionsOpen;
+  save();
+  paintOptions();
+});
+
+straightModeBtn.addEventListener("click", () => setKeyMode("straight"));
+paddleModeBtn.addEventListener("click", () => setKeyMode("paddle"));
+unlockBtn.addEventListener("click", unlockAll);
+unlockCard.addEventListener("click", unlockAll);
+aboutOpen.addEventListener("click", openAbout);
+aboutCard.addEventListener("click", openAbout);
+aboutBack.addEventListener("click", closeAbout);
+pickOpen.addEventListener("click", openPick);
+pickCard.addEventListener("click", openPick);
+pickBack.addEventListener("click", closePick);
+pickLevels.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn || !pickLevels.contains(btn)) return;
+  setPick(KOCH.slice(0, Number(btn.dataset.n)));
+});
+pickAll.addEventListener("click", () => setPick(KOCH));
+pickClear.addEventListener("click", () => setPick([]));
+pickGo.addEventListener("click", () => unlockAnd(startDrill));
+pickExam.addEventListener("click", () => unlockAnd(startLevelExam));
+hearBtn.addEventListener("click", () => unlockAnd(hear));
+
+langBar.addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn || !COPY[btn.dataset.lang]) return;
+  state.lang = btn.dataset.lang;
+  save();
+  applyLang();
+});
+
+overlayBtn.addEventListener("click", () => {
+  if (phase !== "overlay" || !overlayView) return;
+  phase = "starting";
+  const action = overlayView.action;
+  unlockAnd(action);
+});
+
+bindKey(straightBtn, "straight");
+bindKey(ditBtn, "dit");
+bindKey(dahBtn, "dah");
+
+function releasePointer(e) {
+  for (const which of PARTS) {
+    if (!ptrs[which].has(e.pointerId)) continue;
+    ptrs[which].delete(e.pointerId);
+    recompute(which);
+  }
+}
+window.addEventListener("pointerup", releasePointer);
+window.addEventListener("pointercancel", releasePointer);
+
+window.addEventListener("keydown", (e) => {
+  if (!aboutEl.hidden || !pickEl.hidden) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      if (!aboutEl.hidden) closeAbout();
+      else closePick();
+    }
+    return;
+  }
+  const which = whichKey(e.code);
+  if (!which || !keyUseful(which)) return;
+  if (phase !== "ask") return;
+  e.preventDefault();
+  if (e.repeat || kb[which]) return;
+  kb[which] = true;
+  recompute(which);
+}, true);
+
+window.addEventListener("keyup", (e) => {
+  const which = whichKey(e.code);
+  if (!which || !kb[which]) return;
+  kb[which] = false;
+  if (keyUseful(which) && phase === "ask") e.preventDefault();
+  recompute(which);
+}, true);
+
+window.addEventListener("blur", () => {
+  if (phase === "ask") dropHolds();
+  else clearPhysical();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  if (phase === "ask") dropHolds();
+  else clearPhysical();
+});
+
+applyLang();
+showStart();
+</script>
+</body>
+</html>
