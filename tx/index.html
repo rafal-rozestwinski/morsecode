@@ -368,6 +368,10 @@
     color: #f2f2f2;
     padding: 56px 20px 40px;
   }
+  #about { padding-top: 96px; }
+  @media (max-width: 720px) {
+    #about { padding-top: 116px; }
+  }
   #about[hidden], #pick[hidden] { display: none; }
   #about .wrap, #pick .wrap { max-width: 38rem; margin: 0 auto; }
   #about h1, #pick h1 { margin: 0 0 0.6em; font-size: 22px; font-weight: 700; letter-spacing: 0.03em; }
@@ -431,9 +435,9 @@
   <a id="sibling" href="../">Słuchaj</a>
 </div>
 <nav id="lang">
-  <button type="button" data-lang="pl">Polski</button>
-  <button type="button" data-lang="de">Deutsch</button>
-  <button type="button" data-lang="en">English</button>
+  <button type="button" data-lang="pl">PL</button>
+  <button type="button" data-lang="de">DE</button>
+  <button type="button" data-lang="en">EN</button>
 </nav>
 <div id="app" class="straight">
   <header>
@@ -490,6 +494,7 @@
     <p id="overlay-title">Morse</p>
     <p id="overlay-text">Nadaj znak kluczem.</p>
     <button type="button" id="overlay-btn">Start</button>
+    <button type="button" class="link" id="level-back" hidden>Do swojego poziomu</button>
     <button type="button" id="unlock-card">Odblokuj wszystko</button>
     <button type="button" class="link" id="pick-card">Wybierz znaki</button>
     <button type="button" class="link" id="about-card">O metodzie</button>
@@ -598,6 +603,7 @@ const COPY = {
     pass: "Zaliczone",
     fail: "Poniżej 90%",
     again: "Jeszcze raz",
+    ownLevel: "Do swojego poziomu",
     next: "Dalej",
     failText: "{ratio} · próg to 90%",
     examNext: "{ratio} · teraz egzamin, bez kodu",
@@ -658,6 +664,7 @@ const COPY = {
     pass: "Bestanden",
     fail: "Unter 90%",
     again: "Noch einmal",
+    ownLevel: "Zur eigenen Stufe",
     next: "Weiter",
     failText: "{ratio} · Grenze ist 90%",
     examNext: "{ratio} · jetzt die Prüfung, ohne Code",
@@ -718,6 +725,7 @@ const COPY = {
     pass: "Passed",
     fail: "Below 90%",
     again: "Again",
+    ownLevel: "Your own level",
     next: "Next",
     failText: "{ratio} · the bar is 90%",
     examNext: "{ratio} · exam next, no code",
@@ -774,6 +782,7 @@ const aboutTitle = document.getElementById("about-title");
 const aboutBody = document.getElementById("about-body");
 const pickOpen = document.getElementById("pick-open");
 const pickCard = document.getElementById("pick-card");
+const levelBack = document.getElementById("level-back");
 const pickEl = document.getElementById("pick");
 const pickBack = document.getElementById("pick-back");
 const pickTitle = document.getElementById("pick-title");
@@ -802,6 +811,7 @@ const active = { straight: false, dit: false, dah: false };
 let state = load();
 let queue = [];
 let roundMode = "";
+let drillList = [];
 let phase = "overlay";
 let overlayView = null;
 let correct = 0;
@@ -1428,10 +1438,13 @@ function finishChar() {
 
 function paintIntro() {
   const intro = overlayView && (overlayView.kind === "start" || overlayView.kind === "examStart" || overlayView.kind === "done");
+  const drillOver = overlayView && overlayView.kind === "drillAgain";
   unlockCard.hidden = !(intro && !state.finished);
   aboutCard.hidden = !intro;
-  pickCard.hidden = !intro;
+  pickCard.hidden = !(intro || drillOver);
   unlockBtn.hidden = state.finished;
+  levelBack.hidden = !drillOver;
+  if (drillOver) levelBack.textContent = t("ownLevel");
 }
 
 function paintOverlay() {
@@ -1458,6 +1471,10 @@ function paintOverlay() {
   } else if (overlayView.kind === "passExam") {
     title = t("pass");
     text = t("examNext", v);
+  } else if (overlayView.kind === "drillAgain") {
+    title = v.pass ? t("pass") : t("fail");
+    text = v.ratio;
+    button = t("again");
   } else if (overlayView.kind === "passDone" || overlayView.kind === "practice") {
     title = v.pass ? t("pass") : t("fail");
     text = overlayView.kind === "passDone" ? t("fullResult", v) : v.ratio;
@@ -1567,6 +1584,17 @@ function commit() {
   save();
 }
 
+function repeatPicked() {
+  const exam = roundMode === "drillExam";
+  const list = drillList.slice();
+  if (!list.length) {
+    showStart();
+    return;
+  }
+  roundMode = exam ? "drillExam" : "drill";
+  begin(exam ? examQueue(list) : drillQueue(list));
+}
+
 function finishRound() {
   phase = "overlay";
   clearTimeout(timer);
@@ -1579,7 +1607,9 @@ function finishRound() {
   const pass = passed(correct, total);
   if (pass && roundMode !== "practice" && roundMode !== "drill" && roundMode !== "drillExam") commit();
   const ratio = correct + "/" + total;
-  if (roundMode === "practice" || roundMode === "drill" || roundMode === "drillExam") {
+  if (roundMode === "drill" || roundMode === "drillExam") {
+    showOverlay("drillAgain", { pass, ratio }, repeatPicked);
+  } else if (roundMode === "practice") {
     showOverlay("practice", { pass, ratio }, showStart);
   } else if (!pass) {
     const again = roundMode === "exam" ? startExam : startLesson;
@@ -1731,6 +1761,7 @@ function beginPicked(mode, exam) {
   if (!picked.length) return;
   state.drill = picked;
   save();
+  drillList = picked.slice();
   roundMode = mode;
   pickEl.hidden = true;
   aboutEl.hidden = true;
@@ -1929,6 +1960,10 @@ aboutCard.addEventListener("click", openAbout);
 aboutBack.addEventListener("click", closeAbout);
 pickOpen.addEventListener("click", openPick);
 pickCard.addEventListener("click", openPick);
+levelBack.addEventListener("click", () => {
+  if (phase !== "overlay") return;
+  showStart();
+});
 pickBack.addEventListener("click", closePick);
 pickLevels.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
